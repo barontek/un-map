@@ -119,6 +119,8 @@ map.on(L.Draw.Event.DELETED, (e) => {
 // editable; exportGeoJSON() recombines parts that share the same _groupKey.
 let drawnCounter = 0;
 
+const toLatLngs = (ring) => ring.map(([x, y]) => [y, x]);
+
 function makeLayerFromFeature(f) {
   const g = f.geometry;
   const key = f.properties.id || 'drawn_' + (drawnCounter++);
@@ -130,9 +132,9 @@ function makeLayerFromFeature(f) {
     layers.push(poly);
   };
   if (g.type === 'Polygon') {
-    attach(L.polygon(g.coordinates));
+    attach(L.polygon(g.coordinates.map(toLatLngs)));
   } else if (g.type === 'MultiPolygon') {
-    g.coordinates.forEach((part) => attach(L.polygon(part)));
+    g.coordinates.forEach((part) => attach(L.polygon(part.map(toLatLngs))));
   }
   return layers;
 }
