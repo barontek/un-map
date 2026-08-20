@@ -156,6 +156,26 @@ for parent_key, children in merges.items():
     geoms[pk]['names'].append(parent_key)
 print("countries after merges:", len(geoms))
 
+# ---- Separate overlapping territories (China/Taiwan, Russia/Crimea, ...) ----
+# When one country's polygon fully covers another (e.g. China claims Taiwan,
+# Russia draws Crimea inside itself), subtract the covered country from the
+# container so both render as distinct territories regardless of z-order.
+names = list(geoms.keys())
+for na in names:
+    if na not in geoms:
+        continue
+    for nb in names:
+        if na == nb or nb not in geoms:
+            continue
+        A = geoms[na]['geom']
+        B = geoms[nb]['geom']
+        try:
+            inter = A.intersection(B).area
+        except Exception:
+            continue
+        if B.area > 0 and inter > 0.9 * B.area:
+            geoms[na]['geom'] = A.difference(B)
+
 # ---------- Scale SVG polygons to PNG coords ----------
 with Image.open(PNG_PATH) as _im:
     pw, ph = _im.size
