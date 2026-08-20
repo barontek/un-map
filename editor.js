@@ -114,18 +114,22 @@ map.on(L.Draw.Event.DELETED, (e) => {
 
 function loadData(data) {
   editableLayers.clearLayers();
-  const gj = L.geoJSON(data, {
-    style: (f) => styleFor(f.properties.status),
-    onEachFeature: (f, l) => {
-      try {
+  let loaded = 0;
+  data.features.forEach((f) => {
+    try {
+      const gj = L.geoJSON({ type: 'FeatureCollection', features: [f] }, {
+        style: (ff) => styleFor(ff.properties.status),
+      });
+      gj.eachLayer((l) => {
         l.on('click', () => selectLayer(l));
         editableLayers.addLayer(l);
-      } catch (err) {
-        console.warn('Skipping feature:', f.properties.name, err);
-      }
-    },
+        loaded++;
+      });
+    } catch (err) {
+      console.warn('Skipping feature:', f.properties.name, err);
+    }
   });
-  document.title = `UN RP Map Editor (${editableLayers.getLayers().length}/${data.features.length} features)`;
+  document.title = `UN RP Map Editor (${loaded}/${data.features.length} features)`;
 }
 
 function exportGeoJSON() {
