@@ -277,8 +277,6 @@ function showPanel(feature) {
   }
   const body = document.getElementById('panel-body');
   if (body) body.innerHTML = `<span class="badge" style="background:${meta.color}">${meta.label}</span>`;
-  const pid = document.getElementById('panel-id');
-  if (pid) pid.textContent = 'id: ' + p.id;
 }
 
 document.getElementById('panel-close').addEventListener('click', () => {
