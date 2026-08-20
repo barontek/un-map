@@ -348,11 +348,8 @@ search.addEventListener('change', () => {
   if (!f) return;
   const layer = findLayer(f.properties.id);
   if (layer) {
-    map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 3 });
     selectCountry(layer, f);
   } else if (tinyIndex[f.properties.id]) {
-    const m = tinyIndex[f.properties.id].marker;
-    map.setView(m.getLatLng(), Math.max(map.getZoom(), 4));
     selectTiny(f);
   }
 });
@@ -422,11 +419,8 @@ function handleHash() {
   if (!f) return;
   const layer = findLayer(f.properties.id);
   if (layer) {
-    map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 3 });
     selectCountry(layer, f);
   } else if (tinyIndex[f.properties.id]) {
-    const m = tinyIndex[f.properties.id].marker;
-    map.setView(m.getLatLng(), Math.max(map.getZoom(), 4));
     selectTiny(f);
   }
 }
