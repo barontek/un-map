@@ -124,7 +124,10 @@ document.getElementById('prop-clear').addEventListener('click', clearSelection);
 document.getElementById('btn-delete').addEventListener('click', () => {
   const toRemove = selectedGroup.slice();
   clearSelection();
-  toRemove.forEach((l) => editableLayers.removeLayer(l));
+  toRemove.forEach((l) => {
+    restoreUnion(l);
+    editableLayers.removeLayer(l);
+  });
 });
 
 // Status select options
@@ -138,13 +141,77 @@ Object.entries(STATUS_META).forEach(([k, v]) => {
 
 let drawnCounter = 0;
 
+// --- Enclave support: boolean ops with Turf ---
+// Drawing or moving a polygon cuts it out of every country it overlaps
+// (e.g. Vatican inside Italy); deleting an enclave restores the union.
+
+function geomToLatLngs(geom) {
+  const swap = (ring) => ring.map(([x, y]) => [y, x]);
+  if (geom.type === 'Polygon') return geom.coordinates.map(swap);
+  if (geom.type === 'MultiPolygon') return geom.coordinates.map((poly) => poly.map(swap));
+  return null;
+}
+
+function setLayerGeom(layer, geom) {
+  const ll = geomToLatLngs(geom);
+  if (!ll) return;
+  layer.setLatLngs(ll);
+  layer.redraw();
+}
+
+function overlappingLayers(poly) {
+  const b = poly.getBounds();
+  const out = [];
+  editableLayers.eachLayer((l) => {
+    if (l === poly || (poly._groupKey && l._groupKey === poly._groupKey)) return;
+    if (!l.getBounds().intersects(b)) return;
+    out.push(l);
+  });
+  return out;
+}
+
+function carveHole(poly) {
+  if (typeof turf === 'undefined') return;
+  let geom;
+  try { geom = poly.toGeoJSON().geometry; } catch (e) { return; }
+  overlappingLayers(poly).forEach((l) => {
+    try {
+      const diff = turf.difference(l.toGeoJSON().geometry, geom);
+      if (diff && diff.geometry && diff.geometry.coordinates) {
+        setLayerGeom(l, diff.geometry);
+        l.setStyle(styleFor(l.feature.properties.status));
+      }
+    } catch (e) { console.warn('carveHole', l.feature && l.feature.properties.name, e); }
+  });
+}
+
+function restoreUnion(poly) {
+  if (typeof turf === 'undefined') return;
+  let geom;
+  try { geom = poly.toGeoJSON().geometry; } catch (e) { return; }
+  const c = turf.centroid(geom);
+  overlappingLayers(poly).forEach((l) => {
+    try {
+      const other = l.toGeoJSON().geometry;
+      if (!turf.booleanPointInPolygon(c, other)) return;   // only re-merge enclaves
+      const u = turf.union(other, geom);
+      if (u && u.geometry && u.geometry.coordinates) {
+        setLayerGeom(l, u.geometry);
+        l.setStyle(styleFor(l.feature.properties.status));
+      }
+    } catch (e) { console.warn('restoreUnion', l.feature && l.feature.properties.name, e); }
+  });
+}
+
 map.on(L.Draw.Event.CREATED, (e) => {
   const layer = e.layer;
   const props = { name: '', status: 'normal' };
   layer.feature = { type: 'Feature', properties: props };
   layer._groupKey = 'drawn_' + (drawnCounter++);
   layer.on('click', () => selectCountryGroup(layer));
+  layer.on('edit', () => carveHole(layer));
   editableLayers.addLayer(layer);
+  carveHole(layer);
   selectCountryGroup(layer);
 });
 
@@ -159,6 +226,7 @@ function makeLayerFromFeature(f) {
     poly.feature = { type: 'Feature', properties: props };   // shared so edits apply to all parts
     poly._groupKey = key;
     poly.on('click', () => selectCountryGroup(poly));
+    poly.on('edit', () => carveHole(poly));
     layers.push(poly);
   };
   if (g.type === 'Polygon') {
@@ -199,7 +267,11 @@ function buildGeoJSON() {
       };
       delete groups[key].properties.id;
     }
-    groups[key].parts.push(g.coordinates);
+    if (g.type === 'MultiPolygon') {
+      g.coordinates.forEach((part) => groups[key].parts.push(part));
+    } else {
+      groups[key].parts.push(g.coordinates);
+    }
   });
   const features = Object.entries(groups).map(([key, grp]) => {
     const geometry = grp.parts.length === 1
