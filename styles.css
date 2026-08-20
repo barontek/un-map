@@ -15,10 +15,58 @@ html, body {
   background: #123;
 }
 
+/* ---- Top bar ---- */
+#topbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  padding: 6px 8px 6px 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+}
+#topbar .brand { font-weight: 800; font-size: 14px; letter-spacing: 0.01em; }
+#topbar .brand span { font-weight: 500; color: #445; }
+#topbar #stats { color: #556; font-size: 12px; }
+#topbar .actions { display: flex; gap: 6px; }
+#topbar button, #topbar a {
+  border: 1px solid #b9c2cf;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: none;
+  color: #223;
+}
+#topbar button:hover, #topbar a:hover { background: #eef3fb; }
+
+#loading {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 34, 51, 0.6);
+  color: #fff;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+}
+#loading.hidden { display: none; }
+
 /* ---- Legend ---- */
 #legend {
   position: absolute;
-  top: 12px;
+  top: 70px;
   right: 12px;
   z-index: 1000;
   background: rgba(255, 255, 255, 0.95);
@@ -116,7 +164,7 @@ html, body {
 /* ---- Search ---- */
 #search {
   position: absolute;
-  top: 12px;
+  top: 70px;
   left: 12px;
   z-index: 1000;
   width: 240px;

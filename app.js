@@ -43,6 +43,8 @@ let activeStatus = null;
 let selectedLayer = null;
 
 const panel = document.getElementById('panel');
+const loadingEl = document.getElementById('loading');
+const statsEl = document.getElementById('stats');
 
 function styleFor(status, dim) {
   const meta = STATUS_META[status] || STATUS_META.unknown;
@@ -132,6 +134,19 @@ const search = document.getElementById('search');
 fetch('data/countries.geojson')
   .then((r) => r.json())
   .then((data) => {
+    // stats summary
+    const counts = {};
+    data.features.forEach((f) => {
+      const st = f.properties.status || 'unknown';
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    statsEl.textContent = [
+      `P5 ${counts.p5 || 0}`,
+      `SC ${counts.sc || 0}`,
+      `Members ${counts.normal || 0}`,
+      `No group ${counts.nogroup || 0}`,
+    ].join(' · ');
+
     const names = data.features.map((f) => f.properties.name).sort((a, b) => a.localeCompare(b));
     names.forEach((n) => {
       const opt = document.createElement('option');
@@ -140,6 +155,7 @@ fetch('data/countries.geojson')
       search.appendChild(opt);
     });
     countryLayer = L.geoJSON(data, { style: (f) => styleFor(f.properties.status, false), onEachFeature }).addTo(map);
+    loadingEl.classList.add('hidden');
   });
 
 search.addEventListener('change', () => {
@@ -162,6 +178,22 @@ function findLayer(id) {
   });
   return out;
 }
+
+// Reset view
+document.getElementById('btn-reset').addEventListener('click', () => {
+  map.fitBounds([[0, 0], [IMG_H, IMG_W]], { padding: [40, 40] });
+});
+
+// Esc closes panel
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    panel.classList.remove('open');
+    if (selectedLayer) {
+      selectedLayer.setStyle(styleFor(selectedLayer.feature.properties.status, false));
+      selectedLayer = null;
+    }
+  }
+});
 
 // Markers
 fetch('data/markers.json')
