@@ -176,8 +176,7 @@ function showPanel(feature) {
   panel.classList.add('open');
   document.getElementById('panel-title').textContent = p.name;
   document.getElementById('panel-body').innerHTML =
-    `<span class="badge" style="background:${meta.color}">${meta.label}</span>` +
-    `<div>Status: <b>${p.status}</b></div>`;
+    `<span class="badge" style="background:${meta.color}">${meta.label}</span>`;
   document.getElementById('panel-id').textContent = 'id: ' + p.id;
 }
 
