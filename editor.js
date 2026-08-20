@@ -6,19 +6,7 @@
  * _groupKey) because Leaflet.draw can't edit MultiPolygons; export recombines them.
  */
 
-const IMG_W = 2753;
-const IMG_H = 1399;
-
-const STATUS_META = {
-  p5:        { label: 'Permanent 5', color: '#00278b' },
-  sc:        { label: 'Security Council', color: '#0156a6' },
-  normal:    { label: 'Member State', color: '#4190de' },
-  observer:  { label: 'Observer', color: '#22b14c' },
-  disputed:  { label: 'Disputed', color: '#c80915' },
-  suspended: { label: 'Suspended', color: '#232323' },
-  nogroup:   { label: 'Non-Member State', color: '#adadad' },
-  unknown:   { label: 'Not on map', color: '#d8dde4' },
-};
+// IMG_W, IMG_H and STATUS_META come from config.js, shared with the viewer.
 
 const map = L.map('map', {
   crs: L.Util.extend({}, L.CRS.Simple, { transformation: new L.Transformation(1, 0, 1, 0) }),

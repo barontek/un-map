@@ -1,0 +1,11 @@
+{
+  "_comment": "groups.json uses ISO 3166 official names; countries.geojson uses common names. Maps groups.json name -> countries.geojson feature name. Add an entry here when link_groups.py reports an unresolved nation.",
+  "Iran, Islamic Republic of": "Iran",
+  "Korea, Republic of": "Republic of Korea",
+  "Korea, Democratic People's Republic of": "Democratic People's Republic of Korea",
+  "China": "People's Republic of China",
+  "Netherlands": "The Netherlands",
+  "North Macedonia, Republic of": "North Macedonia",
+  "Vietnam, Socialist Republic of": "Vietnam",
+  "Artsakh, Republic of": "Artsakh"
+}

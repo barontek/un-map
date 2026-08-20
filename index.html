@@ -2,49 +2,143 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UN World Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>United Nations World Map</title>
+<meta name="description" content="Interactive map of the Roblox Model United Nations community — member states, Security Council, and every nation's Roblox group.">
+<meta name="theme-color" content="#070C15">
+<meta name="color-scheme" content="dark">
+
+<!-- Link previews (Discord, Twitter, etc). If a preview does not show an
+     image, replace the relative paths below with the full https:// URL of the
+     deployed site — some crawlers refuse to resolve relative og:image. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="UN World Map">
+<meta property="og:title" content="United Nations World Map">
+<meta property="og:description" content="Interactive map of the Roblox Model United Nations community — member states, Security Council, and every nation's Roblox group.">
+<meta property="og:image" content="map.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="United Nations World Map">
+<meta name="twitter:description" content="Interactive map of the Roblox Model United Nations community.">
+<meta name="twitter:image" content="map.png">
+
+<!-- Inline so there is no favicon.ico 404. Simplified from the header emblem:
+     the full olive-branch version turns to mush at 16px. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23070C15'/%3E%3Cg fill='none' stroke='%23009EDB' stroke-width='1.6'%3E%3Ccircle cx='16' cy='16' r='9'/%3E%3Ccircle cx='16' cy='16' r='4.5'/%3E%3Cpath d='M7 16h18M16 7v18'/%3E%3Cellipse cx='16' cy='16' rx='4.5' ry='9'/%3E%3C/g%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<div id="map"></div>
+<body data-view="vector">
 
-<header id="topbar">
-  <div class="brand">United Nations <span>World Map</span></div>
-  <div id="stats"></div>
-  <div class="actions">
-    <button id="toggle-png" class="toggle active" title="Show/hide the PNG background">PNG</button>
-    <button id="toggle-svg" class="toggle active" title="Show/hide country borders (SVG data)">Countries</button>
-    <button id="toggle-pixel" class="toggle" title="Pixelated vector map (looks like the PNG, no PNG needed)">Pixel</button>
-    <button id="btn-reset" title="Reset view">⟲ Reset</button>
-    <a id="link-editor" href="editor.html" title="Edit borders &amp; statuses">Edit</a>
+<!-- UN emblem, defined once and referenced by the header and the loader -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="un-emblem" viewBox="0 0 64 64">
+    <g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+      <circle cx="32" cy="29" r="17"/>
+      <circle cx="32" cy="29" r="11.3"/>
+      <circle cx="32" cy="29" r="5.6"/>
+      <path d="M15 29h34M32 12v34M20 17l24 24M44 17L20 41"/>
+      <ellipse cx="32" cy="29" rx="8.5" ry="17"/>
+      <path d="M23 53C13 47.5 8.5 37.5 10.5 27" stroke-width="1.6"/>
+      <path d="M41 53c10-5.5 14.5-15.5 12.5-26" stroke-width="1.6"/>
+      <path d="M13 33c-2.5-1.5-3-4-2.5-6M15.5 40c-2.5-1-3.5-3.5-3.5-5.5M19.5 46c-2.5-1-3.5-3-3.5-5"/>
+      <path d="M51 33c2.5-1.5 3-4 2.5-6M48.5 40c2.5-1 3.5-3.5 3.5-5.5M44.5 46c2.5-1 3.5-3 3.5-5"/>
+    </g>
+  </symbol>
+</svg>
+
+<div id="map"></div>
+<div id="map-fx"></div>
+
+<header id="brand">
+  <svg class="emblem" aria-hidden="true"><use href="#un-emblem"/></svg>
+  <div class="wordmark">
+    <div class="wm-1"><span class="wm-full">United Nations</span><span class="wm-short">UN Map</span></div>
+    <div class="wm-2">World Map</div>
   </div>
 </header>
 
-<div id="loading">Loading map…</div>
-
-<div id="legend">
-  <div class="legend-item" data-status="p5"><span class="swatch" style="background:#00278b"></span>Permanent 5</div>
-  <div class="legend-item" data-status="sc"><span class="swatch" style="background:#0156a6"></span>Security Council</div>
-  <div class="legend-item" data-status="normal"><span class="swatch" style="background:#4190de"></span>Member State</div>
-  <div class="legend-item" data-status="observer"><span class="swatch" style="background:#22b14c"></span>Observer</div>
-  <div class="legend-item" data-status="disputed"><span class="swatch" style="background:#c80915"></span>Disputed</div>
-  <div class="legend-item" data-status="suspended"><span class="swatch" style="background:#232323"></span>Suspended</div>
-  <div class="legend-item" data-status="nogroup"><span class="swatch" style="background:#adadad"></span>Non-Member State</div>
-  <div class="legend-hint">Click a status to highlight</div>
+<div id="viewmodes">
+  <div class="segmented" id="segmented" role="tablist" aria-label="Map rendering mode">
+    <button role="tab" data-view="vector" aria-selected="true" title="Smooth vector borders">Vector</button>
+    <button role="tab" data-view="pixel" aria-selected="false" title="Pixel-snapped borders, matching the original artwork">Pixel</button>
+    <button role="tab" data-view="classic" aria-selected="false" title="The original PNG artwork">Classic</button>
+  </div>
+  <button id="btn-reset" class="icon-btn" title="Reset view" aria-label="Reset view">&#8635;</button>
 </div>
 
-<div id="panel">
-  <button id="panel-close" aria-label="Close">&times;</button>
-  <div id="panel-title">Select a nation</div>
-  <div id="panel-body">Click any country on the map to see its details.</div>
+<aside id="rail" data-state="browse" data-sheet="open">
+
+  <!-- Mobile only: drags the sheet down so the map is usable. -->
+  <button id="sheet-grip" aria-label="Collapse panel" aria-expanded="true"></button>
+
+  <!-- State A: browse -->
+  <section class="rail-state" id="rail-browse">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-4.2-4.2" stroke-linecap="round"/>
+      </svg>
+      <input id="search" type="text" placeholder="Search nations &amp; organizations…"
+             autocomplete="off" spellcheck="false" aria-label="Search">
+      <span class="kbd">/</span>
+    </div>
+    <div class="rail-sep"></div>
+
+    <div class="rail-scroll" id="browse-scroll">
+      <div id="results" role="listbox" aria-label="Search results"></div>
+
+      <div id="browse-default">
+        <div class="section-head">
+          <span class="eyebrow">Composition</span>
+          <span class="eyebrow" id="total-count"></span>
+        </div>
+        <div id="legend"></div>
+        <div id="composition"></div>
+
+        <div class="rail-sep"></div>
+        <button id="orgs-head" aria-expanded="false" aria-controls="orgs">
+          <div class="section-head">
+            <span class="eyebrow">Organizations</span>
+            <span class="eyebrow"><span id="orgs-count"></span> <span class="chev">&#9662;</span></span>
+          </div>
+        </button>
+        <div id="orgs" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- State B: a single nation -->
+  <section class="rail-state" id="rail-nation">
+    <div class="nation-head">
+      <button id="back" aria-label="Back to browse">&#8592;</button>
+      <div class="nation-id">
+        <div id="nation-name"></div>
+        <span class="badge" id="nation-badge"></span>
+      </div>
+    </div>
+    <div class="rail-sep"></div>
+    <div class="nation-body rail-scroll" id="nation-body"></div>
+  </section>
+
+</aside>
+
+<div id="credit">ComradeZac &middot; segradovsk_y &middot; GustavHagglund</div>
+
+<div id="loading">
+  <svg class="emblem" aria-hidden="true"><use href="#un-emblem"/></svg>
+  <div class="bar"></div>
+  <noscript>
+    <div class="load-error">
+      <div class="eyebrow">JavaScript required</div>
+      <p>This map is interactive and needs JavaScript enabled to load.</p>
+    </div>
+  </noscript>
 </div>
 
-<select id="search" aria-label="Search country">
-  <option value="">Jump to a country…</option>
-</select>
-
+<script src="config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
 </body>

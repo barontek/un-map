@@ -6,8 +6,15 @@
 <title>UN Map Editor</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
-<link rel="stylesheet" href="styles.css">
 <style>
+  /* Editor keeps its own light chrome; styles.css is the dark viewer theme. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #1b2a41;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #map { position: absolute; inset: 0; background: #123; }
+  .leaflet-tooltip.country-label { background: rgba(20,30,50,.9); color: #fff;
+    border: none; border-radius: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; }
+
   #toolbar {
     position: absolute;
     top: 12px;
@@ -86,6 +93,7 @@
   <div id="export-note">Tip: click a country to edit just its borders/vertices. New polygons use the draw tool (top-right). Export saves to <code>data/countries.geojson</code>.</div>
 </div>
 
+<script src="config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
