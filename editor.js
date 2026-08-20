@@ -32,7 +32,7 @@ const editableLayers = new L.FeatureGroup();
 map.addLayer(editableLayers);
 
 const drawControl = new L.Control.Draw({
-  position: 'topleft',
+  position: 'topright',
   draw: {
     polygon: { shapeOptions: { color: '#1f6feb', weight: 2, fillOpacity: 0.25 } },
     polyline: false,
@@ -116,12 +116,16 @@ function loadData(data) {
   editableLayers.clearLayers();
   const gj = L.geoJSON(data, {
     style: (f) => styleFor(f.properties.status),
+    onEachFeature: (f, l) => {
+      try {
+        l.on('click', () => selectLayer(l));
+        editableLayers.addLayer(l);
+      } catch (err) {
+        console.warn('Skipping feature:', f.properties.name, err);
+      }
+    },
   });
-  gj.eachLayer((l) => {
-    l.on('click', () => selectLayer(l));
-    editableLayers.addLayer(l);
-  });
-  document.title = `UN RP Map Editor (${data.features.length} features)`;
+  document.title = `UN RP Map Editor (${editableLayers.getLayers().length}/${data.features.length} features)`;
 }
 
 function exportGeoJSON() {

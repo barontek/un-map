@@ -204,6 +204,33 @@ def dominant_status(geom):
         return None
     return list(PALETTE.keys())[vals[np.argmax(counts)] - 1]
 
+def ring_ok(ring):
+    coords = list(ring.coords)
+    if len(coords) < 3:
+        return False
+    uniq = set((round(x, 1), round(y, 1)) for x, y in coords)
+    if len(uniq) < 3:
+        return False
+    area = abs(Polygon(coords).area)
+    return area > 1e-4
+
+def clean_geom(geom):
+    """Drop rings that collapsed to a point (tiny islands crushed by simplify)."""
+    if geom.geom_type == 'Polygon':
+        if not ring_ok(geom.exterior):
+            return None
+        interiors = [r for r in geom.interiors if ring_ok(r)]
+        return Polygon(geom.exterior.coords, interiors)
+    if geom.geom_type == 'MultiPolygon':
+        polys = [clean_geom(p) for p in geom.geoms]
+        polys = [p for p in polys if p is not None and not p.is_empty]
+        if not polys:
+            return None
+        if len(polys) == 1:
+            return polys[0]
+        return MultiPolygon(polys)
+    return geom
+
 features = []
 status_hist = {}
 overrides = {}
@@ -216,7 +243,9 @@ norm_overrides = {norm_match(k): v for k, v in overrides.items()}
 for key, info in geoms.items():
     g_png = scale_geom(info['geom'])
     st = dominant_status(g_png)
-    g_out = g_png.simplify(SIMPLIFY_TOL, preserve_topology=True)
+    g_out = clean_geom(g_png.simplify(SIMPLIFY_TOL, preserve_topology=True))
+    if g_out is None:
+        continue
     name = info['names'][0]
     ov = norm_overrides.get(norm_match(name))
     if ov is None:
