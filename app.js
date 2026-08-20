@@ -102,6 +102,60 @@ function flagEmoji(iso2) {
   return iso2.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
+// ---- Tiny countries (sub-pixel polygons) render as clickable flag markers ----
+const TINY_AREA = 10;
+let tinyMarkers = null;
+const tinyIndex = {};   // id -> { feature, marker }
+
+function geomArea(geom) {
+  const ringArea = (ring) => {
+    let a = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const [x1, y1] = ring[i];
+      const [x2, y2] = ring[(i + 1) % ring.length];
+      a += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(a) / 2;
+  };
+  const rings = geom.type === 'Polygon' ? [geom.coordinates[0]] : geom.coordinates.map((p) => p[0]);
+  return rings.reduce((s, r) => s + ringArea(r), 0);
+}
+
+function geomCentroid(geom) {
+  let sx = 0, sy = 0, n = 0;
+  const push = (ring) => ring.forEach(([x, y]) => { sx += x; sy += y; n++; });
+  if (geom.type === 'Polygon') geom.coordinates.forEach(push);
+  else geom.coordinates.forEach((p) => p.forEach(push));
+  return n ? [sx / n, sy / n] : [IMG_W / 2, IMG_H / 2];
+}
+
+function buildTinyMarkers(features) {
+  const layer = L.layerGroup();
+  features.forEach((f) => {
+    const [x, y] = geomCentroid(f.geometry);
+    const icon = L.divIcon({
+      className: 'tiny-marker',
+      html: `<span>${flagEmoji(f.properties.iso2) || '•'}</span>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+    const m = L.marker([y, x], { icon });
+    m.bindTooltip(`${flagEmoji(f.properties.iso2)} ${f.properties.name}`, { className: 'country-label', sticky: true });
+    m.on('click', () => selectTiny(f, m));
+    layer.addLayer(m);
+    tinyIndex[f.properties.id] = { feature: f, marker: m };
+    countryIndex[f.properties.id] = f;
+    countryIndex[f.properties.name] = f;
+  });
+  return layer;
+}
+
+function selectTiny(feature) {
+  clearSelection();
+  showPanel(feature);
+  location.hash = '#' + encodeURIComponent(feature.properties.id);
+}
+
 function onEachFeature(feature, layer) {
   const p = feature.properties;
   countryIndex[p.id] = feature;
@@ -231,9 +285,17 @@ fetch('data/countries.geojson')
       opt.textContent = n;
       search.appendChild(opt);
     });
-    countryLayer = smoothLayer = L.geoJSON(data, { style: (f) => styleFor(f.properties.status, false), onEachFeature }).addTo(map);
-    const pixData = { ...data, features: data.features.map((f) => ({ ...f, geometry: snapGeom(f.geometry, 1) })) };
+    const tinyFeatures = [];
+    const polyFeatures = [];
+    data.features.forEach((f) => {
+      if (geomArea(f.geometry) < TINY_AREA) tinyFeatures.push(f);
+      else polyFeatures.push(f);
+    });
+    const polyData = { ...data, features: polyFeatures };
+    countryLayer = smoothLayer = L.geoJSON(polyData, { style: (f) => styleFor(f.properties.status, false), onEachFeature }).addTo(map);
+    const pixData = { ...polyData, features: polyFeatures.map((f) => ({ ...f, geometry: snapGeom(f.geometry, 1) })) };
     pixelLayer = L.geoJSON(pixData, { style: (f) => pixelStyle(f.properties.status), onEachFeature });
+    tinyMarkers = buildTinyMarkers(tinyFeatures).addTo(map);
     applyView();
     loadingEl.classList.add('hidden');
   });
@@ -248,6 +310,10 @@ search.addEventListener('change', () => {
   if (layer) {
     map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 3 });
     selectCountry(layer, f);
+  } else if (tinyIndex[f.properties.id]) {
+    const m = tinyIndex[f.properties.id].marker;
+    map.setView(m.getLatLng(), Math.max(map.getZoom(), 4));
+    selectTiny(f);
   }
 });
 
@@ -318,6 +384,10 @@ function handleHash() {
   if (layer) {
     map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 3 });
     selectCountry(layer, f);
+  } else if (tinyIndex[f.properties.id]) {
+    const m = tinyIndex[f.properties.id].marker;
+    map.setView(m.getLatLng(), Math.max(map.getZoom(), 4));
+    selectTiny(f);
   }
 }
 window.addEventListener('hashchange', handleHash);
