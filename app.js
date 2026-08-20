@@ -13,7 +13,7 @@ const STATUS_META = {
   observer:  { label: 'Observer', color: '#22b14c' },
   disputed:  { label: 'Disputed', color: '#c80915' },
   suspended: { label: 'Suspended', color: '#232323' },
-  nogroup:   { label: 'No Roblox Group', color: '#adadad' },
+  nogroup:   { label: 'Non-Member State', color: '#adadad' },
   unknown:   { label: 'Not on map', color: '#d8dde4' },
 };
 
