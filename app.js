@@ -42,6 +42,12 @@ let countryIndex = {}; // id/name -> feature
 let activeStatus = null;
 let selectedLayer = null;
 let pngVisible = true;
+let smoothOn = true;
+let pixelOn = false;
+
+let rawData = null;
+let smoothLayer = null;
+let pixelLayer = null;
 
 const panel = document.getElementById('panel');
 const loadingEl = document.getElementById('loading');
@@ -60,6 +66,37 @@ function styleFor(status, dim) {
   };
 }
 
+// Pixelated look: solid fill + white 1px borders, matching the raster PNG.
+function pixelStyle(status, dim) {
+  const meta = STATUS_META[status] || STATUS_META.unknown;
+  if (dim) {
+    return { fillColor: '#222', fillOpacity: 0.3, color: '#444', weight: 0.5 };
+  }
+  return { fillColor: meta.color, fillOpacity: 0.92, color: '#ffffff', weight: 1 };
+}
+
+function layerStyle(props, dim) {
+  return pixelOn ? pixelStyle(props.status, dim) : styleFor(props.status, dim);
+}
+
+// Snap every vertex to an integer pixel grid so borders become blocky like the
+// PNG. If a ring would collapse (thin islands), keep its original coordinates.
+function snapGeom(geom, grid) {
+  const snap = (v) => Math.round(v / grid) * grid;
+  const snapRing = (ring) => {
+    const snapped = ring.map(([x, y]) => [snap(x), snap(y)]);
+    const uniq = new Set(snapped.map(([x, y]) => x + ',' + y));
+    return uniq.size >= 3 ? snapped : ring;
+  };
+  if (geom.type === 'Polygon') {
+    return { ...geom, coordinates: geom.coordinates.map(snapRing) };
+  }
+  if (geom.type === 'MultiPolygon') {
+    return { ...geom, coordinates: geom.coordinates.map((poly) => poly.map(snapRing)) };
+  }
+  return geom;
+}
+
 function onEachFeature(feature, layer) {
   const p = feature.properties;
   countryIndex[p.id] = feature;
@@ -75,7 +112,7 @@ function onEachFeature(feature, layer) {
     },
     mouseout: () => {
       layer.closeTooltip();
-      if (selectedLayer !== layer) layer.setStyle(styleFor(p.status, dimmed(p.status)));
+      if (selectedLayer !== layer) layer.setStyle(layerStyle(p, dimmed(p.status)));
     },
   });
 }
@@ -84,16 +121,46 @@ function dimmed(status) {
   return activeStatus !== null && status !== activeStatus;
 }
 
+function clearSelection() {
+  if (selectedLayer) {
+    selectedLayer.setStyle(layerStyle(selectedLayer.feature.properties, false));
+    selectedLayer = null;
+  }
+  panel.classList.remove('open');
+}
+
 function reloadStyles() {
   if (!countryLayer) return;
   countryLayer.eachLayer((l) => {
     const st = l.feature.properties.status;
-    if (l !== selectedLayer) l.setStyle(styleFor(st, dimmed(st)));
+    if (l !== selectedLayer) l.setStyle(layerStyle(l.feature.properties, dimmed(st)));
   });
 }
 
+function applyView() {
+  const showPng = pngVisible && !pixelOn;
+  if (showPng && !map.hasLayer(pngOverlay)) map.addLayer(pngOverlay);
+  if (!showPng && map.hasLayer(pngOverlay)) map.removeLayer(pngOverlay);
+
+  const showSmooth = smoothOn && !pixelOn;
+  if (smoothLayer) {
+    if (showSmooth && !map.hasLayer(smoothLayer)) map.addLayer(smoothLayer);
+    if (!showSmooth && map.hasLayer(smoothLayer)) map.removeLayer(smoothLayer);
+  }
+  if (pixelLayer) {
+    if (pixelOn && !map.hasLayer(pixelLayer)) map.addLayer(pixelLayer);
+    if (!pixelOn && map.hasLayer(pixelLayer)) map.removeLayer(pixelLayer);
+  }
+  countryLayer = pixelOn ? pixelLayer : smoothLayer;
+  clearSelection();
+  reloadStyles();
+  document.getElementById('toggle-png').classList.toggle('active', pngVisible && !pixelOn);
+  document.getElementById('toggle-svg').classList.toggle('active', smoothOn && !pixelOn);
+  document.getElementById('toggle-pixel').classList.toggle('active', pixelOn);
+}
+
 function selectCountry(layer, feature) {
-  if (selectedLayer) selectedLayer.setStyle(styleFor(selectedLayer.feature.properties.status, false));
+  if (selectedLayer) selectedLayer.setStyle(layerStyle(selectedLayer.feature.properties, false));
   selectedLayer = layer;
   layer.setStyle({ fillColor: STATUS_META[feature.properties.status]?.color || '#888', fillOpacity: 0.55, color: '#fff', weight: 2 });
   layer.bringToFront();
@@ -115,7 +182,7 @@ function showPanel(feature) {
 document.getElementById('panel-close').addEventListener('click', () => {
   panel.classList.remove('open');
   if (selectedLayer) {
-    selectedLayer.setStyle(styleFor(selectedLayer.feature.properties.status, false));
+    selectedLayer.setStyle(layerStyle(selectedLayer.feature.properties, false));
     selectedLayer = null;
   }
 });
@@ -155,7 +222,10 @@ fetch('data/countries.geojson')
       opt.textContent = n;
       search.appendChild(opt);
     });
-    countryLayer = L.geoJSON(data, { style: (f) => styleFor(f.properties.status, false), onEachFeature }).addTo(map);
+    countryLayer = smoothLayer = L.geoJSON(data, { style: (f) => styleFor(f.properties.status, false), onEachFeature }).addTo(map);
+    const pixData = { ...data, features: data.features.map((f) => ({ ...f, geometry: snapGeom(f.geometry, 1) })) };
+    pixelLayer = L.geoJSON(pixData, { style: (f) => pixelStyle(f.properties.status), onEachFeature });
+    applyView();
     loadingEl.classList.add('hidden');
   });
 
@@ -186,30 +256,21 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 // PNG background toggle
-document.getElementById('toggle-png').addEventListener('click', (e) => {
-  const btn = e.currentTarget;
-  if (map.hasLayer(pngOverlay)) {
-    map.removeLayer(pngOverlay);
-    pngVisible = false;
-    btn.classList.remove('active');
-  } else {
-    map.addLayer(pngOverlay);
-    pngVisible = true;
-    btn.classList.add('active');
-  }
-  reloadStyles();
+document.getElementById('toggle-png').addEventListener('click', () => {
+  pngVisible = !pngVisible;
+  applyView();
 });
 
-// Countries (SVG data) toggle
-document.getElementById('toggle-svg').addEventListener('click', (e) => {
-  const btn = e.currentTarget;
-  if (countryLayer && map.hasLayer(countryLayer)) {
-    map.removeLayer(countryLayer);
-    btn.classList.remove('active');
-  } else if (countryLayer) {
-    map.addLayer(countryLayer);
-    btn.classList.add('active');
-  }
+// Countries (smooth SVG data) toggle
+document.getElementById('toggle-svg').addEventListener('click', () => {
+  smoothOn = !smoothOn;
+  applyView();
+});
+
+// Pixelated vector mode (looks like the PNG, no PNG needed)
+document.getElementById('toggle-pixel').addEventListener('click', () => {
+  pixelOn = !pixelOn;
+  applyView();
 });
 
 // Esc closes panel
@@ -217,7 +278,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     panel.classList.remove('open');
     if (selectedLayer) {
-      selectedLayer.setStyle(styleFor(selectedLayer.feature.properties.status, false));
+      selectedLayer.setStyle(layerStyle(selectedLayer.feature.properties, false));
       selectedLayer = null;
     }
   }
