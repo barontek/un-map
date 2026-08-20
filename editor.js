@@ -34,12 +34,15 @@ const pngOverlay = L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]]).addTo(map
 
 document.getElementById('btn-png').addEventListener('click', (e) => {
   const btn = e.currentTarget;
+  const mapEl = document.getElementById('map');
   if (map.hasLayer(pngOverlay)) {
     map.removeLayer(pngOverlay);
     btn.classList.remove('active');
+    mapEl.style.background = '#ffffff';
   } else {
     map.addLayer(pngOverlay);
     btn.classList.add('active');
+    mapEl.style.background = '#123';
   }
 });
 

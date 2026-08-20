@@ -139,6 +139,8 @@ function reloadStyles() {
 
 function applyView() {
   const showPng = pngVisible && !pixelOn;
+  const mapEl = document.getElementById('map');
+  mapEl.style.background = showPng ? '#123' : '#ffffff';   // white ocean in SVG view
   if (showPng && !map.hasLayer(pngOverlay)) map.addLayer(pngOverlay);
   if (!showPng && map.hasLayer(pngOverlay)) map.removeLayer(pngOverlay);
 
