@@ -1,0 +1,40 @@
+{
+  "United States of America": [
+    "American Samoa",
+    "Guam",
+    "Northern Mariana Islands",
+    "Puerto Rico",
+    "Virgin Islands, U.S."
+  ],
+  "United Kingdom": [
+    "Anguilla",
+    "British Indian Ocean Territory",
+    "Cayman Islands",
+    "Falkland Islands (Islas Malvinas)",
+    "Jersey",
+    "Guernsey",
+    "Montserrat",
+    "Turks and Caicos Islands",
+    "Virgin Islands, British"
+  ],
+  "France": [
+    "French Guiana",
+    "French Polynesia",
+    "French Southern Territories",
+    "Guadeloupe",
+    "Martinique",
+    "Mayotte",
+    "New Caledonia",
+    "Reunion",
+    "Saint Barthelemy",
+    "Saint Martin (French Part)",
+    "Saint Pierre and Miquelon",
+    "Wallis and Futuna"
+  ],
+  "Netherlands": [
+    "Aruba",
+    "Bonaire, Sint Eustatius and Saba",
+    "Curacao",
+    "Sint Maarten (Dutch Part)"
+  ]
+}

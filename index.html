@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UN RP World Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="map"></div>
+
+<div id="legend">
+  <div class="legend-title">United Nations</div>
+  <div class="legend-item" data-status="p5"><span class="swatch" style="background:#00278b"></span>Permanent 5</div>
+  <div class="legend-item" data-status="sc"><span class="swatch" style="background:#0156a6"></span>Security Council</div>
+  <div class="legend-item" data-status="normal"><span class="swatch" style="background:#4190de"></span>Member State</div>
+  <div class="legend-item" data-status="observer"><span class="swatch" style="background:#22b14c"></span>Observer</div>
+  <div class="legend-item" data-status="disputed"><span class="swatch" style="background:#c80915"></span>Disputed</div>
+  <div class="legend-item" data-status="suspended"><span class="swatch" style="background:#232323"></span>Suspended</div>
+  <div class="legend-item" data-status="nogroup"><span class="swatch" style="background:#adadad"></span>No Roblox Group</div>
+  <div class="legend-hint">Click a status to highlight</div>
+</div>
+
+<div id="panel">
+  <button id="panel-close" aria-label="Close">&times;</button>
+  <div id="panel-title">Select a nation</div>
+  <div id="panel-body">Click any country on the map to see its details.</div>
+</div>
+
+<select id="search" aria-label="Search country">
+  <option value="">Jump to a country…</option>
+</select>
+
+<div id="attribution">UN RP Map &middot; source map: Wikimedia BlankMap-World</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
