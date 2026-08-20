@@ -1,4 +1,4 @@
-/* UN RP map - Leaflet app
+/* UN map - Leaflet app
  * Coordinate space: the PNG (2753x1399) is the map. GeoJSON country coordinates
  * are in PNG pixel units [x, y] via Leaflet CRS.Simple.
  */

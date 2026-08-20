@@ -1,4 +1,4 @@
-/* UN RP map editor - Leaflet + Leaflet.draw
+/* UN map editor - Leaflet + Leaflet.draw
  * Same coordinate space as the main site: PNG pixel units [x, y], CRS.Simple no-y-flip.
  *
  * UX: click a country to select it - only that country's geometry is shown and
@@ -344,7 +344,7 @@ function loadData(data) {
       console.warn('Skipping feature:', f.properties.name, err);
     }
   });
-  document.title = `UN RP Map Editor (${loaded}/${data.features.length} features)`;
+  document.title = `UN Map Editor (${loaded}/${data.features.length} features)`;
   computeTrueBases();
 }
 
