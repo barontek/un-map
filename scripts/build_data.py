@@ -4,7 +4,7 @@ grouped nation is a member state (normal) unless it is P5/SC (status_overrides),
 while organizations (data/organizations.json) are excluded.
 Coordinates are in PNG pixel space: [x, y] (Leaflet CRS.Simple uses [lng=x, lat=y]).
 """
-import json, os, unicodedata
+import json, os, sys, unicodedata
 import xml.etree.ElementTree as ET
 import svgpathtools
 from PIL import Image
@@ -19,6 +19,14 @@ OVERRIDES_PATH = os.path.join(ROOT, 'data', 'status_overrides.json')
 MERGES_PATH = os.path.join(ROOT, 'data', 'merges.json')
 GROUPS_PATH = os.path.join(ROOT, 'data', 'groups.json')
 ORGS_PATH = os.path.join(ROOT, 'data', 'organizations.json')
+
+# data/countries.geojson is the LIVE data (edited via editor.html -> export).
+# This script is only for regenerating it from source; refuse to clobber manual
+# edits unless --force is passed.
+if os.path.exists(OUT) and '--force' not in sys.argv:
+    print('NOT overwriting existing data/countries.geojson (it is the live source of truth).')
+    print('Pass --force to regenerate from the source SVG/configs and overwrite it.')
+    sys.exit(0)
 
 ns = 'http://www.w3.org/2000/svg'
 P = '{' + ns + '}'
