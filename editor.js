@@ -217,6 +217,30 @@ function recomputeFor(poly, prevBounds) {
   affectedLayers(poly, prevBounds).forEach(recomputeCountry);
 }
 
+// Countries loaded from data may already have holes carved (Taiwan in China,
+// San Marino/Vatican in Italy). Rebuild each country's true base = its shape
+// unioned with any enclaves whose centroid lies inside it, so later moves
+// restore those holes correctly.
+function computeTrueBases() {
+  if (typeof turf === 'undefined') return;
+  const layers = [];
+  editableLayers.eachLayer((l) => layers.push(l));
+  layers.forEach((c) => {
+    const cb = c.getBounds();
+    layers.forEach((o) => {
+      if (o === c || o._groupKey === c._groupKey || !o._baseGeom) return;
+      if (!o.getBounds().intersects(cb)) return;
+      const og = o.toGeoJSON().geometry;
+      try {
+        if (turf.booleanPointInPolygon(turf.centroid(og), c._baseGeom)) {
+          const u = turf.union(c._baseGeom, og);
+          if (u && u.geometry) c._baseGeom = u.geometry;
+        }
+      } catch (e) { /* ignore */ }
+    });
+  });
+}
+
 map.on(L.Draw.Event.CREATED, (e) => {
   const layer = e.layer;
   const props = { name: '', status: 'normal' };
@@ -270,6 +294,7 @@ function loadData(data) {
     }
   });
   document.title = `UN RP Map Editor (${loaded}/${data.features.length} features)`;
+  computeTrueBases();
 }
 
 function buildGeoJSON() {
