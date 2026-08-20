@@ -34,7 +34,7 @@ root = ET.parse(SVG_PATH).getroot()
 SW = float(root.get('width'))
 SH = float(root.get('height'))
 
-def seg_points(seg, n=16):
+def seg_points(seg, n=40):
     if isinstance(seg, svgpathtools.Line):
         return [seg.start, seg.end]
     if isinstance(seg, (svgpathtools.CubicBezier, svgpathtools.QuadraticBezier, svgpathtools.Arc)):
@@ -244,11 +244,34 @@ def clean_geom(geom):
         return MultiPolygon(polys)
     return geom
 
+def polygon_only(geom, min_area=0.05):
+    """Keep only Polygon/MultiPolygon parts, dropping LineStrings/Points slivers
+    (leftovers from unary_union / difference) and sub-pixel slivers."""
+    parts = []
+    def collect(g):
+        if g is None or g.is_empty:
+            return
+        if g.geom_type == 'Polygon':
+            if g.area >= min_area:
+                parts.append(g)
+        elif g.geom_type in ('MultiPolygon', 'GeometryCollection'):
+            for gg in g.geoms:
+                collect(gg)
+    collect(geom)
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return unary_union(parts)
+
 features = []
 status_hist = {}
-SIMPLIFY_TOL = 0.8
+SIMPLIFY_TOL = 0.1
 for key, info in geoms.items():
-    g_png = scale_geom(info['geom'])
+    g_svg = polygon_only(info['geom'])
+    if g_svg is None:
+        continue
+    g_png = scale_geom(g_svg)
     g_out = clean_geom(g_png.simplify(SIMPLIFY_TOL, preserve_topology=True))
     if g_out is None:
         continue
