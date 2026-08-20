@@ -217,7 +217,17 @@ function reloadStyles() {
   if (!countryLayer) return;
   countryLayer.eachLayer((l) => {
     const st = l.feature.properties.status;
-    if (l !== selectedLayer) l.setStyle(layerStyle(l.feature.properties, dimmed(st)));
+    const d = dimmed(st);
+    if (l === selectedLayer) {
+      // dim the selected country too when it doesn't match the filter
+      if (d) l.setStyle(layerStyle(l.feature.properties, true));
+      else l.setStyle({ fillColor: STATUS_META[st]?.color || '#888', fillOpacity: 0.55, color: '#fff', weight: 2 });
+    } else {
+      l.setStyle(layerStyle(l.feature.properties, d));
+    }
+  });
+  Object.values(tinyIndex).forEach(({ feature, marker }) => {
+    marker.setOpacity(dimmed(feature.properties.status) ? 0.25 : 1);
   });
 }
 

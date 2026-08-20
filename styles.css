@@ -78,12 +78,6 @@ html, body {
   font-size: 13px;
   min-width: 180px;
 }
-.legend-title {
-  font-weight: 700;
-  font-size: 14px;
-  margin-bottom: 8px;
-  letter-spacing: 0.02em;
-}
 .legend-item {
   display: flex;
   align-items: center;
