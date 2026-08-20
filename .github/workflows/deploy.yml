@@ -26,8 +26,9 @@ jobs:
       - name: Prepare public files
         run: |
           mkdir -p public/data
-          cp index.html app.js styles.css map.png public/
-          cp data/countries.geojson data/markers.json public/data/
+          cp index.html app.js config.js styles.css map.png public/
+          cp data/countries.min.geojson data/countries.geojson \
+             data/country_groups.json data/markers.json public/data/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
