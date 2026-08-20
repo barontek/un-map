@@ -102,23 +102,29 @@ function flagEmoji(iso2) {
   return iso2.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
+// Only member states get flag emojis; others (nogroup, disputed, ...) don't.
+const MEMBER_STATUSES = ['p5', 'sc', 'normal', 'observer'];
+const isMember = (status) => MEMBER_STATUSES.includes(status);
+const flagFor = (feature) => (isMember(feature.properties.status) ? flagEmoji(feature.properties.iso2) : '');
+
 // ---- Tiny countries (sub-pixel polygons) render as clickable flag markers ----
 const TINY_AREA = 10;
 let tinyMarkers = null;
 const tinyIndex = {};   // id -> { feature, marker }
 
+function ringAreaOf(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
 function geomArea(geom) {
-  const ringArea = (ring) => {
-    let a = 0;
-    for (let i = 0; i < ring.length; i++) {
-      const [x1, y1] = ring[i];
-      const [x2, y2] = ring[(i + 1) % ring.length];
-      a += x1 * y2 - x2 * y1;
-    }
-    return Math.abs(a) / 2;
-  };
   const rings = geom.type === 'Polygon' ? [geom.coordinates[0]] : geom.coordinates.map((p) => p[0]);
-  return rings.reduce((s, r) => s + ringArea(r), 0);
+  return rings.reduce((s, r) => s + ringAreaOf(r), 0);
 }
 
 function geomCentroid(geom) {
@@ -129,18 +135,37 @@ function geomCentroid(geom) {
   return n ? [sx / n, sy / n] : [IMG_W / 2, IMG_H / 2];
 }
 
+// Anchor point for a tiny country's marker. For a MultiPolygon spread across
+// the map (e.g. Kiribati), a plain centroid lands in the wrong ocean/country,
+// so anchor on the centroid of the largest polygon part instead.
+function geomAnchor(geom) {
+  if (geom.type !== 'MultiPolygon') return geomCentroid(geom);
+  let best = null, bestArea = -1;
+  geom.coordinates.forEach((poly) => {
+    const a = ringAreaOf(poly[0]);
+    if (a > bestArea) { bestArea = a; best = poly[0]; }
+  });
+  if (best) {
+    let sx = 0, sy = 0;
+    best.forEach(([x, y]) => { sx += x; sy += y; });
+    return [sx / best.length, sy / best.length];
+  }
+  return geomCentroid(geom);
+}
+
 function buildTinyMarkers(features) {
   const layer = L.layerGroup();
   features.forEach((f) => {
-    const [x, y] = geomCentroid(f.geometry);
+    const [x, y] = geomAnchor(f.geometry);
+    const flag = flagFor(f);
     const icon = L.divIcon({
       className: 'tiny-marker',
-      html: `<span>${flagEmoji(f.properties.iso2) || '•'}</span>`,
+      html: `<span>${flag || '•'}</span>`,
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });
     const m = L.marker([y, x], { icon });
-    m.bindTooltip(`${flagEmoji(f.properties.iso2)} ${f.properties.name}`, { className: 'country-label', sticky: true });
+    m.bindTooltip(`${flag ? flag + ' ' : ''}${f.properties.name}`, { className: 'country-label', sticky: true });
     m.on('click', () => selectTiny(f, m));
     layer.addLayer(m);
     tinyIndex[f.properties.id] = { feature: f, marker: m };
@@ -167,7 +192,7 @@ function onEachFeature(feature, layer) {
         layer.setStyle({ fillOpacity: 0.45, color: '#ffffff', weight: 1.5 });
         layer.bringToFront();
       }
-      layer.bindTooltip(`${flagEmoji(p.iso2)} ${p.name}`, { className: 'country-label', sticky: true }).openTooltip();
+      layer.bindTooltip(`${flagFor(feature)} ${p.name}`.trim(), { className: 'country-label', sticky: true }).openTooltip();
     },
     mouseout: () => {
       layer.closeTooltip();
@@ -234,7 +259,7 @@ function showPanel(feature) {
   const meta = STATUS_META[p.status] || STATUS_META.unknown;
   panel.classList.add('open');
   document.getElementById('panel-title').textContent = '';
-  const flag = flagEmoji(p.iso2);
+  const flag = flagFor(feature);
   document.getElementById('panel-title').appendChild(document.createTextNode(flag ? flag + ' ' : ''));
   document.getElementById('panel-title').appendChild(document.createTextNode(p.name));
   document.getElementById('panel-body').innerHTML =
