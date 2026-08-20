@@ -19,6 +19,7 @@ OVERRIDES_PATH = os.path.join(ROOT, 'data', 'status_overrides.json')
 MERGES_PATH = os.path.join(ROOT, 'data', 'merges.json')
 GROUPS_PATH = os.path.join(ROOT, 'data', 'groups.json')
 ORGS_PATH = os.path.join(ROOT, 'data', 'organizations.json')
+CALIB_PATH = os.path.join(ROOT, 'data', 'calibration.json')
 
 # data/countries.geojson is the LIVE data (edited via editor.html -> export).
 # This script is only for regenerating it from source; refuse to clobber manual
@@ -189,10 +190,21 @@ with Image.open(PNG_PATH) as _im:
     pw, ph = _im.size
 sx, sy = pw / SW, ph / SH
 
+# Optional sub-pixel calibration (from scripts/calibrate.py): png = a*svg + b.
+cal = {}
+if os.path.exists(CALIB_PATH):
+    with open(CALIB_PATH) as f:
+        cal = json.load(f)
+
+def to_png(x, y):
+    if cal:
+        return cal['ax'] * x + cal['bx'], cal['ay'] * y + cal['by']
+    return x * sx, y * sy
+
 def scale_geom(geom):
     if geom.geom_type == 'Polygon':
-        return Polygon([(x * sx, y * sy) for x, y in geom.exterior.coords],
-                       [[(x * sx, y * sy) for x, y in ring.coords] for ring in geom.interiors])
+        return Polygon([to_png(x, y) for x, y in geom.exterior.coords],
+                       [[to_png(x, y) for x, y in ring.coords] for ring in geom.interiors])
     if geom.geom_type == 'MultiPolygon':
         return MultiPolygon([scale_geom(p) for p in geom.geoms])
     return geom
