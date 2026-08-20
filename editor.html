@@ -59,6 +59,7 @@
   <h2>Map Editor</h2>
   <div class="btn-row">
     <button id="btn-export" class="primary">Export GeoJSON</button>
+    <button id="btn-delete">Delete country</button>
     <button id="btn-reset">Reset view</button>
   </div>
   <div id="props">
@@ -72,7 +73,7 @@
       <button id="prop-clear">Deselect</button>
     </div>
   </div>
-  <div id="export-note">Tip: exported JSON replaces <code>data/countries.geojson</code>. The draw/delete/edit tools are in the toolbar on the left of the map.</div>
+  <div id="export-note">Tip: click a country to edit just its borders/vertices. New polygons use the draw tool (top-right). Exported JSON replaces <code>data/countries.geojson</code>.</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

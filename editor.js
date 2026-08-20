@@ -1,5 +1,9 @@
 /* UN RP map editor - Leaflet + Leaflet.draw
  * Same coordinate space as the main site: PNG pixel units [x, y], CRS.Simple no-y-flip.
+ *
+ * UX: click a country to select it - only that country's geometry is shown and
+ * editable. MultiPolygons are split into individual Polygon layers (grouped by
+ * _groupKey) because Leaflet.draw can't edit MultiPolygons; export recombines them.
  */
 
 const IMG_W = 2753;
@@ -31,6 +35,7 @@ L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]]).addTo(map);
 const editableLayers = new L.FeatureGroup();
 map.addLayer(editableLayers);
 
+// Only the draw-polygon tool is built in; editing is per-country on click.
 const drawControl = new L.Control.Draw({
   position: 'topright',
   draw: {
@@ -41,10 +46,7 @@ const drawControl = new L.Control.Draw({
     marker: false,
     circlemarker: false,
   },
-  edit: {
-    featureGroup: editableLayers,
-    edit: { remove: true },
-  },
+  edit: false,
 });
 map.addControl(drawControl);
 
@@ -53,21 +55,46 @@ function styleFor(status) {
   return { fillColor: meta.color, color: '#333', weight: 1.2, fillOpacity: 0.45 };
 }
 
+let selectedGroup = [];   // array of layers for the selected country
+
+function groupFor(layer) {
+  const key = layer._groupKey;
+  const out = [];
+  editableLayers.eachLayer((l) => { if (l._groupKey === key) out.push(l); });
+  return out;
+}
+
+function clearSelection() {
+  selectedGroup.forEach((l) => {
+    if (l.editing) { try { l.editing.disable(); } catch (e) {} }
+    l.setStyle(styleFor(l.feature.properties.status));
+  });
+  selectedGroup = [];
+  window._selected = null;
+  document.getElementById('props').classList.remove('open');
+}
+
+function selectCountryGroup(layer) {
+  clearSelection();
+  const group = groupFor(layer);
+  selectedGroup = group;
+  window._selected = group[0];
+  group.forEach((l) => {
+    if (!l.editing) l.editing = new L.Edit.Poly(l);
+    try { l.editing.enable(); } catch (e) { console.warn('edit failed', l.feature.properties.name, e); }
+    l.setStyle({ color: '#ffd700', weight: 3, fillOpacity: 0.55 });
+    l.bringToFront();
+  });
+  setPropsUI(group[0]);
+  document.getElementById('props').classList.add('open');
+}
+
 function setPropsUI(layer) {
   const p = layer.feature.properties;
-  const box = document.getElementById('props');
-  box.classList.add('open');
   document.getElementById('prop-name').value = p.name || '';
   document.getElementById('prop-status').value = p.status || 'normal';
   const meta = STATUS_META[p.status] || STATUS_META.unknown;
   document.getElementById('status-note').textContent = meta.label;
-}
-
-function selectLayer(layer) {
-  editableLayers.eachLayer((l) => l.setStyle(styleFor(l.feature.properties.status)));
-  layer.setStyle({ color: '#ffd700', weight: 3, fillOpacity: 0.55 });
-  setPropsUI(layer);
-  window._selected = layer;
 }
 
 document.getElementById('prop-save').addEventListener('click', () => {
@@ -75,13 +102,15 @@ document.getElementById('prop-save').addEventListener('click', () => {
   if (!l) return;
   l.feature.properties.name = document.getElementById('prop-name').value.trim();
   l.feature.properties.status = document.getElementById('prop-status').value;
-  l.setStyle(styleFor(l.feature.properties.status));
+  selectedGroup.forEach((x) => x.setStyle(styleFor(x.feature.properties.status)));
 });
 
-document.getElementById('prop-clear').addEventListener('click', () => {
-  editableLayers.eachLayer((l) => l.setStyle(styleFor(l.feature.properties.status)));
-  window._selected = null;
-  document.getElementById('props').classList.remove('open');
+document.getElementById('prop-clear').addEventListener('click', clearSelection);
+
+document.getElementById('btn-delete').addEventListener('click', () => {
+  const toRemove = selectedGroup.slice();
+  clearSelection();
+  toRemove.forEach((l) => editableLayers.removeLayer(l));
 });
 
 // Status select options
@@ -93,42 +122,29 @@ Object.entries(STATUS_META).forEach(([k, v]) => {
   statusSel.appendChild(o);
 });
 
+let drawnCounter = 0;
+
 map.on(L.Draw.Event.CREATED, (e) => {
   const layer = e.layer;
-  layer.feature = { type: 'Feature', properties: { name: '', status: 'normal' } };
+  const props = { name: '', status: 'normal' };
+  layer.feature = { type: 'Feature', properties: props };
   layer._groupKey = 'drawn_' + (drawnCounter++);
-  layer.on('click', () => selectLayer(layer));
+  layer.on('click', () => selectCountryGroup(layer));
   editableLayers.addLayer(layer);
-  selectLayer(layer);
+  selectCountryGroup(layer);
 });
-
-map.on(L.Draw.Event.EDITED, (e) => {
-  e.layers.eachLayer((l) => l.setStyle(styleFor(l.feature.properties.status)));
-});
-
-map.on(L.Draw.Event.DELETED, (e) => {
-  if (window._selected && e.layers.hasLayer(window._selected)) {
-    window._selected = null;
-    document.getElementById('props').classList.remove('open');
-  }
-});
-
-// Leaflet.draw's Edit.Poly cannot edit MultiPolygons (it throws "Invalid LatLng"
-// when a MultiPolygon's first polygon has multiple rings). We split every
-// MultiPolygon into individual single-ring Polygon layers so all of them are
-// editable; exportGeoJSON() recombines parts that share the same _groupKey.
-let drawnCounter = 0;
 
 const toLatLngs = (ring) => ring.map(([x, y]) => [y, x]);
 
 function makeLayerFromFeature(f) {
   const g = f.geometry;
   const key = f.properties.id || 'drawn_' + (drawnCounter++);
+  const props = { ...f.properties };
   const layers = [];
   const attach = (poly) => {
-    poly.feature = { type: 'Feature', properties: { ...f.properties } };
+    poly.feature = { type: 'Feature', properties: props };   // shared so edits apply to all parts
     poly._groupKey = key;
-    poly.on('click', () => selectLayer(poly));
+    poly.on('click', () => selectCountryGroup(poly));
     layers.push(poly);
   };
   if (g.type === 'Polygon') {
@@ -141,6 +157,7 @@ function makeLayerFromFeature(f) {
 
 function loadData(data) {
   editableLayers.clearLayers();
+  clearSelection();
   let loaded = 0;
   data.features.forEach((f) => {
     try {
