@@ -1,0 +1,37 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build a public-only bundle: the viewer site and just the data the
+      # browser needs. The editor, scripts and internal configs are NOT
+      # deployed so they stay private.
+      - name: Prepare public files
+        run: |
+          mkdir -p public/data
+          cp index.html app.js styles.css map.png public/
+          cp data/countries.geojson data/markers.json public/data/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - uses: actions/deploy-pages@v4
+        id: deployment
