@@ -50,6 +50,9 @@
   }
   #status-note { font-size: 11px; color: #889; margin-top: 4px; }
   #export-note { font-size: 11px; color: #667; margin-top: 8px; }
+  #save-msg { font-size: 12px; font-weight: 600; margin-top: 8px; min-height: 16px; }
+  #save-msg.save-ok { color: #1a7f37; }
+  #save-msg.save-error { color: #c80915; }
   #link a { color: #1f6feb; }
 </style>
 </head>
@@ -75,7 +78,8 @@
       <button id="prop-clear">Deselect</button>
     </div>
   </div>
-  <div id="export-note">Tip: click a country to edit just its borders/vertices. New polygons use the draw tool (top-right). Exported JSON replaces <code>data/countries.geojson</code>.</div>
+  <div id="save-msg"></div>
+  <div id="export-note">Tip: click a country to edit just its borders/vertices. New polygons use the draw tool (top-right). Export saves to <code>data/countries.geojson</code>.</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

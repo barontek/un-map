@@ -186,7 +186,7 @@ function loadData(data) {
   document.title = `UN RP Map Editor (${loaded}/${data.features.length} features)`;
 }
 
-function exportGeoJSON() {
+function buildGeoJSON() {
   const groups = {};
   editableLayers.eachLayer((l) => {
     let g;
@@ -207,17 +207,43 @@ function exportGeoJSON() {
       : { type: 'MultiPolygon', coordinates: grp.parts };
     return { type: 'Feature', properties: { ...grp.properties, id: key }, geometry };
   });
-  const out = {
+  return {
     type: 'FeatureCollection',
     crs: { type: 'name', properties: { name: 'urn:unmap:image-pixels' } },
     features,
   };
+}
+
+function downloadGeoJSON(out) {
   const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'countries.geojson';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function showSaveMsg(text, isErr) {
+  const el = document.getElementById('save-msg');
+  el.textContent = text;
+  el.className = isErr ? 'save-error' : 'save-ok';
+}
+
+async function exportGeoJSON() {
+  const out = buildGeoJSON();
+  try {
+    const res = await fetch('api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(out),
+    });
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error((j && j.error) || 'save failed (' + res.status + ')');
+    showSaveMsg('Saved to data/countries.geojson (' + j.features + ' features)', false);
+  } catch (err) {
+    downloadGeoJSON(out);
+    showSaveMsg('Downloaded countries.geojson (no save server) — ' + err.message, true);
+  }
   return out;
 }
 
