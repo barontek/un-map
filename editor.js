@@ -96,6 +96,7 @@ Object.entries(STATUS_META).forEach(([k, v]) => {
 map.on(L.Draw.Event.CREATED, (e) => {
   const layer = e.layer;
   layer.feature = { type: 'Feature', properties: { name: '', status: 'normal' } };
+  layer._groupKey = 'drawn_' + (drawnCounter++);
   layer.on('click', () => selectLayer(layer));
   editableLayers.addLayer(layer);
   selectLayer(layer);
@@ -112,16 +113,36 @@ map.on(L.Draw.Event.DELETED, (e) => {
   }
 });
 
+// Leaflet.draw's Edit.Poly cannot edit MultiPolygons (it throws "Invalid LatLng"
+// when a MultiPolygon's first polygon has multiple rings). We split every
+// MultiPolygon into individual single-ring Polygon layers so all of them are
+// editable; exportGeoJSON() recombines parts that share the same _groupKey.
+let drawnCounter = 0;
+
+function makeLayerFromFeature(f) {
+  const g = f.geometry;
+  const key = f.properties.id || 'drawn_' + (drawnCounter++);
+  const layers = [];
+  const attach = (poly) => {
+    poly.feature = { type: 'Feature', properties: { ...f.properties } };
+    poly._groupKey = key;
+    poly.on('click', () => selectLayer(poly));
+    layers.push(poly);
+  };
+  if (g.type === 'Polygon') {
+    attach(L.polygon(g.coordinates));
+  } else if (g.type === 'MultiPolygon') {
+    g.coordinates.forEach((part) => attach(L.polygon(part)));
+  }
+  return layers;
+}
+
 function loadData(data) {
   editableLayers.clearLayers();
   let loaded = 0;
   data.features.forEach((f) => {
     try {
-      const gj = L.geoJSON({ type: 'FeatureCollection', features: [f] }, {
-        style: (ff) => styleFor(ff.properties.status),
-      });
-      gj.eachLayer((l) => {
-        l.on('click', () => selectLayer(l));
+      makeLayerFromFeature(f).forEach((l) => {
         editableLayers.addLayer(l);
         loaded++;
       });
@@ -133,12 +154,25 @@ function loadData(data) {
 }
 
 function exportGeoJSON() {
-  const features = [];
+  const groups = {};
   editableLayers.eachLayer((l) => {
     let g;
-    try { g = l.toGeoJSON(); } catch (err) { return; }
-    g.properties = l.feature ? { ...l.feature.properties } : { name: '', status: 'normal' };
-    features.push(g);
+    try { g = l.toGeoJSON().geometry; } catch (err) { return; }
+    const key = l._groupKey || l.feature.properties.id || 'drawn';
+    if (!groups[key]) {
+      groups[key] = {
+        properties: l.feature ? { ...l.feature.properties } : { name: '', status: 'normal' },
+        parts: [],
+      };
+      delete groups[key].properties.id;
+    }
+    groups[key].parts.push(g.coordinates);
+  });
+  const features = Object.entries(groups).map(([key, grp]) => {
+    const geometry = grp.parts.length === 1
+      ? { type: 'Polygon', coordinates: grp.parts[0] }
+      : { type: 'MultiPolygon', coordinates: grp.parts };
+    return { type: 'Feature', properties: { ...grp.properties, id: key }, geometry };
   });
   const out = {
     type: 'FeatureCollection',
