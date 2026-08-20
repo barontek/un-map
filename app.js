@@ -337,6 +337,7 @@ fetch('data/countries.geojson')
     tinyMarkers = buildTinyMarkers(tinyFeatures).addTo(map);
     applyView();
     loadingEl.classList.add('hidden');
+    handleHash();   // honor an initial #/country deep link once
   });
 
 search.addEventListener('change', () => {
@@ -430,4 +431,3 @@ function handleHash() {
   }
 }
 window.addEventListener('hashchange', handleHash);
-setInterval(() => { if (countryLayer) handleHash(); }, 300);
