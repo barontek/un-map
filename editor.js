@@ -199,9 +199,9 @@ function recomputeCountry(c) {
     if (!o.getBounds().intersects(cb)) return;
     const og = o.toGeoJSON().geometry;
     try {
-      const inter = turf.intersect(result, og);
+      const inter = turf.intersect(turf.featureCollection([turf.feature(result), turf.feature(og)]));
       if (inter && inter.geometry && geomArea(inter.geometry) > 0.5 * geomArea(og)) {
-        const diff = turf.difference(result, og);
+        const diff = turf.difference(turf.featureCollection([turf.feature(result), turf.feature(og)]));
         if (diff && diff.geometry && diff.geometry.coordinates) {
           result = diff.geometry;
         }
@@ -218,22 +218,29 @@ function recomputeFor(poly, prevBounds) {
 }
 
 // Countries loaded from data may already have holes carved (Taiwan in China,
-// San Marino/Vatican in Italy). Rebuild each country's true base = its shape
-// unioned with any enclaves whose centroid lies inside it, so later moves
-// restore those holes correctly.
+// San Marino/Vatican in Italy). Rebuild each country's true base by filling
+// every hole with the enclave that sits inside it, so later moves restore
+// those holes correctly. (An enclave lies inside a hole, so it doesn't
+// intersect the country polygon itself - we match it to the hole instead.)
 function computeTrueBases() {
   if (typeof turf === 'undefined') return;
   const layers = [];
   editableLayers.eachLayer((l) => layers.push(l));
   layers.forEach((c) => {
-    const cb = c.getBounds();
+    const holes = [];
+    const collect = (g) => {
+      if (g.type === 'Polygon') g.coordinates.slice(1).forEach((r) => holes.push(turf.feature({ type: 'Polygon', coordinates: [r] })));
+      else if (g.type === 'MultiPolygon') g.coordinates.forEach((p) => p.slice(1).forEach((r) => holes.push(turf.feature({ type: 'Polygon', coordinates: [r] }))));
+    };
+    collect(c._baseGeom);
+    if (!holes.length) return;
     layers.forEach((o) => {
       if (o === c || o._groupKey === c._groupKey || !o._baseGeom) return;
-      if (!o.getBounds().intersects(cb)) return;
       const og = o.toGeoJSON().geometry;
       try {
-        if (turf.booleanPointInPolygon(turf.centroid(og), c._baseGeom)) {
-          const u = turf.union(c._baseGeom, og);
+        const pt = turf.pointOnFeature(turf.feature(og));
+        if (holes.some((h) => turf.booleanPointInPolygon(pt, h))) {
+          const u = turf.union(turf.featureCollection([turf.feature(c._baseGeom), turf.feature(og)]));
           if (u && u.geometry) c._baseGeom = u.geometry;
         }
       } catch (e) { /* ignore */ }
