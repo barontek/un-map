@@ -33,6 +33,7 @@
   #toolbar button:hover { background: #eef3fb; }
   #toolbar button.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
   #toolbar button.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .mode-toggle { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; cursor: pointer; }
   #props {
     display: none;
     margin-top: 8px;
@@ -67,6 +68,9 @@
     <button id="btn-png" class="active">PNG</button>
     <button id="btn-reset">Reset view</button>
   </div>
+  <label class="mode-toggle" title="Hide edge markers so you can only delete/move nodes, never add them">
+    <input type="checkbox" id="btn-delete-only"> Delete nodes only
+  </label>
   <div id="props">
     <label>Name</label>
     <input id="prop-name" type="text">

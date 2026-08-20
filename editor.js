@@ -96,6 +96,7 @@ function selectCountryGroup(layer) {
   group.forEach((l) => {
     if (!l.editing) l.editing = new L.Edit.Poly(l);
     try { l.editing.enable(); } catch (e) { console.warn('edit failed', l.feature.properties.name, e); }
+    if (deleteOnlyMode) hideMiddleMarkersFor(l);
     l.setStyle({ color: '#ffd700', weight: 3, fillOpacity: 0.55 });
     l.bringToFront();
   });
@@ -141,6 +142,43 @@ Object.entries(STATUS_META).forEach(([k, v]) => {
 });
 
 let drawnCounter = 0;
+
+// --- Delete-nodes-only mode ---
+// Hides the edge "middle" markers that insert new vertices when clicked, so
+// you can only move/delete existing nodes, never accidentally add new ones.
+let deleteOnlyMode = false;
+
+function middleMarkersFor(l) {
+  const out = [];
+  if (!l.editing || !l.editing._verticesHandlers) return out;
+  l.editing._verticesHandlers.forEach((h) => {
+    if (!h._markerGroup) return;
+    h._markerGroup.eachLayer((m) => {
+      if (h._markers.indexOf(m) === -1) out.push(m);   // middle markers aren't vertices
+    });
+  });
+  return out;
+}
+
+function hideMiddleMarkersFor(l) {
+  middleMarkersFor(l).forEach((m) => { if (m._map) m._map.removeLayer(m); });
+}
+
+function showMiddleMarkersFor(l) {
+  middleMarkersFor(l).forEach((m) => { if (!m._map) map.addLayer(m); });
+}
+
+function applyDeleteOnly() {
+  editableLayers.eachLayer((l) => {
+    if (deleteOnlyMode) hideMiddleMarkersFor(l);
+    else showMiddleMarkersFor(l);
+  });
+}
+
+document.getElementById('btn-delete-only').addEventListener('change', (e) => {
+  deleteOnlyMode = e.target.checked;
+  applyDeleteOnly();
+});
 
 // --- Enclave support: recompute holes with Turf boolean ops ---
 // Every layer keeps a _baseGeom (its shape with no holes carved by others).
@@ -256,7 +294,10 @@ map.on(L.Draw.Event.CREATED, (e) => {
   layer._baseGeom = layer.toGeoJSON().geometry;
   layer.on('click', () => selectCountryGroup(layer));
   layer.on('editstart', () => { layer._prevBounds = layer.getBounds(); });
-  layer.on('edit', () => recomputeFor(layer, layer._prevBounds));
+  layer.on('edit', () => {
+    recomputeFor(layer, layer._prevBounds);
+    if (deleteOnlyMode) hideMiddleMarkersFor(layer);
+  });
   editableLayers.addLayer(layer);
   recomputeFor(layer);
   selectCountryGroup(layer);
@@ -275,7 +316,10 @@ function makeLayerFromFeature(f) {
     poly._baseGeom = poly.toGeoJSON().geometry;
     poly.on('click', () => selectCountryGroup(poly));
     poly.on('editstart', () => { poly._prevBounds = poly.getBounds(); });
-    poly.on('edit', () => recomputeFor(poly, poly._prevBounds));
+    poly.on('edit', () => {
+      recomputeFor(poly, poly._prevBounds);
+      if (deleteOnlyMode) hideMiddleMarkersFor(poly);
+    });
     layers.push(poly);
   };
   if (g.type === 'Polygon') {
