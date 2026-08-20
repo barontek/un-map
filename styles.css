@@ -48,6 +48,8 @@ html, body {
   color: #223;
 }
 #topbar button:hover, #topbar a:hover { background: #eef3fb; }
+#topbar button.toggle { background: #e7edf5; color: #334; border-color: #c3cdda; }
+#topbar button.toggle.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
 
 #loading {
   position: absolute;

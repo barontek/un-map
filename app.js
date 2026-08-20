@@ -33,7 +33,7 @@ const map = L.map('map', {
 // Fit image with a little padding so world edges aren't glued to viewport edge
 map.fitBounds([[0, 0], [IMG_H, IMG_W]], { padding: [40, 40] });
 
-L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]], {
+const pngOverlay = L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]], {
   className: 'map-img',
 }).addTo(map);
 
@@ -41,6 +41,7 @@ let countryLayer = null;
 let countryIndex = {}; // id/name -> feature
 let activeStatus = null;
 let selectedLayer = null;
+let pngVisible = true;
 
 const panel = document.getElementById('panel');
 const loadingEl = document.getElementById('loading');
@@ -53,7 +54,7 @@ function styleFor(status, dim) {
   }
   return {
     fillColor: meta.color,
-    fillOpacity: 0.18,
+    fillOpacity: pngVisible ? 0.18 : 0.6,
     color: 'rgba(0,0,0,0)',
     weight: 1,
   };
@@ -182,6 +183,33 @@ function findLayer(id) {
 // Reset view
 document.getElementById('btn-reset').addEventListener('click', () => {
   map.fitBounds([[0, 0], [IMG_H, IMG_W]], { padding: [40, 40] });
+});
+
+// PNG background toggle
+document.getElementById('toggle-png').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (map.hasLayer(pngOverlay)) {
+    map.removeLayer(pngOverlay);
+    pngVisible = false;
+    btn.classList.remove('active');
+  } else {
+    map.addLayer(pngOverlay);
+    pngVisible = true;
+    btn.classList.add('active');
+  }
+  reloadStyles();
+});
+
+// Countries (SVG data) toggle
+document.getElementById('toggle-svg').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (countryLayer && map.hasLayer(countryLayer)) {
+    map.removeLayer(countryLayer);
+    btn.classList.remove('active');
+  } else if (countryLayer) {
+    map.addLayer(countryLayer);
+    btn.classList.add('active');
+  }
 });
 
 // Esc closes panel

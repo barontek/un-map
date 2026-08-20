@@ -30,7 +30,18 @@ const map = L.map('map', {
 map.setView([IMG_H / 2, IMG_W / 2], 0);
 map.fitBounds([[0, 0], [IMG_H, IMG_W]], { padding: [40, 40] });
 
-L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]]).addTo(map);
+const pngOverlay = L.imageOverlay('map.png', [[0, 0], [IMG_H, IMG_W]]).addTo(map);
+
+document.getElementById('btn-png').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (map.hasLayer(pngOverlay)) {
+    map.removeLayer(pngOverlay);
+    btn.classList.remove('active');
+  } else {
+    map.addLayer(pngOverlay);
+    btn.classList.add('active');
+  }
+});
 
 const editableLayers = new L.FeatureGroup();
 map.addLayer(editableLayers);
