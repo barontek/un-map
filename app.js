@@ -268,13 +268,17 @@ function showPanel(feature) {
   const p = feature.properties;
   const meta = STATUS_META[p.status] || STATUS_META.unknown;
   panel.classList.add('open');
-  document.getElementById('panel-title').textContent = '';
-  const flag = flagFor(feature);
-  document.getElementById('panel-title').appendChild(document.createTextNode(flag ? flag + ' ' : ''));
-  document.getElementById('panel-title').appendChild(document.createTextNode(p.name));
-  document.getElementById('panel-body').innerHTML =
-    `<span class="badge" style="background:${meta.color}">${meta.label}</span>`;
-  document.getElementById('panel-id').textContent = 'id: ' + p.id;
+  const title = document.getElementById('panel-title');
+  if (title) {
+    title.textContent = '';
+    const flag = flagFor(feature);
+    title.appendChild(document.createTextNode(flag ? flag + ' ' : ''));
+    title.appendChild(document.createTextNode(p.name));
+  }
+  const body = document.getElementById('panel-body');
+  if (body) body.innerHTML = `<span class="badge" style="background:${meta.color}">${meta.label}</span>`;
+  const pid = document.getElementById('panel-id');
+  if (pid) pid.textContent = 'id: ' + p.id;
 }
 
 document.getElementById('panel-close').addEventListener('click', () => {
