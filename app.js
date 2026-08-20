@@ -97,6 +97,11 @@ function snapGeom(geom, grid) {
   return geom;
 }
 
+function flagEmoji(iso2) {
+  if (!iso2 || !/^[A-Z]{2}$/.test(iso2)) return '';
+  return iso2.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
 function onEachFeature(feature, layer) {
   const p = feature.properties;
   countryIndex[p.id] = feature;
@@ -108,7 +113,7 @@ function onEachFeature(feature, layer) {
         layer.setStyle({ fillOpacity: 0.45, color: '#ffffff', weight: 1.5 });
         layer.bringToFront();
       }
-      layer.bindTooltip(p.name, { className: 'country-label', sticky: true }).openTooltip();
+      layer.bindTooltip(`${flagEmoji(p.iso2)} ${p.name}`, { className: 'country-label', sticky: true }).openTooltip();
     },
     mouseout: () => {
       layer.closeTooltip();
@@ -174,7 +179,10 @@ function showPanel(feature) {
   const p = feature.properties;
   const meta = STATUS_META[p.status] || STATUS_META.unknown;
   panel.classList.add('open');
-  document.getElementById('panel-title').textContent = p.name;
+  document.getElementById('panel-title').textContent = '';
+  const flag = flagEmoji(p.iso2);
+  document.getElementById('panel-title').appendChild(document.createTextNode(flag ? flag + ' ' : ''));
+  document.getElementById('panel-title').appendChild(document.createTextNode(p.name));
   document.getElementById('panel-body').innerHTML =
     `<span class="badge" style="background:${meta.color}">${meta.label}</span>`;
   document.getElementById('panel-id').textContent = 'id: ' + p.id;
