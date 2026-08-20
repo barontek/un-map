@@ -1,14 +1,15 @@
-"""Build data/countries.geojson from SVG geometry + PNG status colors.
+"""Build data/countries.geojson from SVG geometry.
+Country status comes from the Roblox ally group list (data/groups.json): every
+grouped nation is a member state (normal) unless it is P5/SC (status_overrides),
+while organizations (data/organizations.json) are excluded.
 Coordinates are in PNG pixel space: [x, y] (Leaflet CRS.Simple uses [lng=x, lat=y]).
 """
-import json, re, os, unicodedata
+import json, os, unicodedata
 import xml.etree.ElementTree as ET
 import svgpathtools
-import numpy as np
 from PIL import Image
 from shapely.geometry import Polygon, MultiPolygon, mapping
 from shapely.ops import unary_union
-import rasterio.features
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SVG_PATH = '/tmp/opencode/blankmap.svg'
@@ -16,22 +17,14 @@ PNG_PATH = os.path.join(ROOT, 'map.png')
 OUT = os.path.join(ROOT, 'data', 'countries.geojson')
 OVERRIDES_PATH = os.path.join(ROOT, 'data', 'status_overrides.json')
 MERGES_PATH = os.path.join(ROOT, 'data', 'merges.json')
+GROUPS_PATH = os.path.join(ROOT, 'data', 'groups.json')
+ORGS_PATH = os.path.join(ROOT, 'data', 'organizations.json')
 
 ns = 'http://www.w3.org/2000/svg'
 P = '{' + ns + '}'
 root = ET.parse(SVG_PATH).getroot()
 SW = float(root.get('width'))
 SH = float(root.get('height'))
-
-PALETTE = {
-    'normal':    (65, 143, 222),
-    'sc':        (1, 86, 166),
-    'p5':        (0, 39, 137),
-    'nogroup':   (173, 173, 173),
-    'disputed':  (200, 9, 21),
-    'suspended': (35, 35, 35),
-    'observer':  (34, 177, 76),
-}
 
 def seg_points(seg, n=16):
     if isinstance(seg, svgpathtools.Line):
@@ -92,19 +85,34 @@ def norm_name(name):
             n = n[: -len(suf)]
     return n.strip()
 
-# Merge duplicates by normalized name
-merged = {}
+# Build one feature per SVG entry; only merge true duplicates (same normalized
+# name AND overlapping by area), so e.g. North/South Korea and the two Congos
+# stay separate while "China" / "China, People's Republic of" merge together.
+geoms = {}   # key -> {'geom':..., 'names':[...]}
+order = []
 for name, rings in countries.items():
-    key = norm_name(name)
-    merged.setdefault(key, {'names': [], 'rings': []})
-    merged[key]['names'].append(name)
-    merged[key]['rings'].extend(rings)
+    g = unary_union(rings)
+    if g is None or g.is_empty:
+        continue
+    nkey = norm_name(name)
+    merged_into = None
+    for key in order:
+        if norm_name(key) == nkey:
+            a, b = geoms[key]['geom'], g
+            ov = a.intersection(b).area
+            if ov > 0.5 * min(a.area, b.area):  # true duplicate (e.g. China vs China PRC)
+                merged_into = key
+                break
+    if merged_into is not None:
+        geoms[merged_into]['geom'] = unary_union([geoms[merged_into]['geom'], g])
+        geoms[merged_into]['names'].append(name)
+    else:
+        geoms[name] = {'geom': g, 'names': [name]}
+        order.append(name)
 
-geoms = {}
-for key, info in merged.items():
-    g = unary_union(info['rings'])
-    if g is not None and not g.is_empty:
-        geoms[key] = {'geom': g, 'names': info['names']}
+def preferred_name(names):
+    return min(names, key=lambda n: len(n))
+
 print("countries after dedupe:", len(geoms))
 
 def norm_match(name):
@@ -148,19 +156,10 @@ for parent_key, children in merges.items():
     geoms[pk]['names'].append(parent_key)
 print("countries after merges:", len(geoms))
 
-# ---------- PNG status classification ----------
-im = np.array(Image.open(PNG_PATH).convert('RGB')).astype(int)
-ph, pw, _ = im.shape
+# ---------- Scale SVG polygons to PNG coords ----------
+with Image.open(PNG_PATH) as _im:
+    pw, ph = _im.size
 sx, sy = pw / SW, ph / SH
-
-# class per pixel: 0 = bg, 1..7 = palette
-cls = np.zeros((ph, pw), np.int8)
-for i, (k, c) in enumerate(PALETTE.items(), start=1):
-    cls[(np.abs(im - np.array(c)).sum(axis=2) <= 30)] = i
-
-# Scale SVG polygons to PNG coords
-def to_png(geom):
-    return geom.__class__ if False else None
 
 def scale_geom(geom):
     if geom.geom_type == 'Polygon':
@@ -170,39 +169,25 @@ def scale_geom(geom):
         return MultiPolygon([scale_geom(p) for p in geom.geoms])
     return geom
 
-def dominant_status(geom):
-    """Rasterize polygon over its bbox, tally pixel status classes.
-    Falls back to a small window around the representative point for tiny polygons."""
-    x0, y0, x1, y1 = map(int, geom.bounds)
-    x0, y0 = max(0, x0), max(0, y0)
-    x1, y1 = min(pw - 1, x1), min(ph - 1, y1)
-    if x1 <= x0 or y1 <= y0:
-        return None
-    transform = rasterio.transform.from_bounds(x0, y0, x1 + 1, y1 + 1, x1 - x0 + 1, y1 - y0 + 1)
-    mask = rasterio.features.rasterize([(geom, 1)], out_shape=(y1 - y0 + 1, x1 - x0 + 1), transform=transform)
-    sub = cls[y0:y1 + 1, x0:x1 + 1][mask == 1]
-    if sub.size < 6:
-        # tiny polygon: sample a window around representative point
-        c = geom.representative_point()
-        cx, cy = int(c.x), int(c.y)
-        r = 10
-        vals = []
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                xx, yy = cx + dx, cy + dy
-                if 0 <= xx < pw and 0 <= yy < ph and cls[yy, xx] > 0:
-                    vals.append(cls[yy, xx])
-        if not vals:
-            return None
-        vals = np.array(vals)
-        vv, cc = np.unique(vals, return_counts=True)
-        return list(PALETTE.keys())[vv[np.argmax(cc)] - 1]
-    if sub.size == 0:
-        return None
-    vals, counts = np.unique(sub[sub > 0], return_counts=True)
-    if vals.size == 0:
-        return None
-    return list(PALETTE.keys())[vals[np.argmax(counts)] - 1]
+def norm_caseless(name):
+    return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode().lower()
+
+# ---- Status from the Roblox ally group list ----
+with open(GROUPS_PATH) as f:
+    groups = json.load(f)            # id -> readable name
+with open(ORGS_PATH) as f:
+    organizations = set(json.load(f))
+with open(OVERRIDES_PATH) as f:
+    overrides = json.load(f)
+norm_overrides = {norm_caseless(k): v for k, v in overrides.items()}
+norm_orgs = {norm_caseless(n) for n in organizations}
+grouped_names = {norm_caseless(n) for n in groups.values() if norm_caseless(n) not in norm_orgs}
+print("grouped (non-org) nations in ally list:", len(grouped_names))
+
+# which ally groups map to a dataset country?
+dataset_names = {norm_caseless(info['names'][0]) for info in geoms.values()}
+unmatched_groups = sorted(grouped_names - dataset_names)
+print("ally nations with no dataset match:", len(unmatched_groups), unmatched_groups)
 
 def ring_ok(ring):
     coords = list(ring.coords)
@@ -233,30 +218,23 @@ def clean_geom(geom):
 
 features = []
 status_hist = {}
-overrides = {}
-if os.path.exists(OVERRIDES_PATH):
-    with open(OVERRIDES_PATH) as f:
-        overrides = json.load(f)
 SIMPLIFY_TOL = 0.8
-# accent/case-insensitive overrides lookup
-norm_overrides = {norm_match(k): v for k, v in overrides.items()}
 for key, info in geoms.items():
     g_png = scale_geom(info['geom'])
-    st = dominant_status(g_png)
     g_out = clean_geom(g_png.simplify(SIMPLIFY_TOL, preserve_topology=True))
     if g_out is None:
         continue
-    name = info['names'][0]
-    ov = norm_overrides.get(norm_match(name))
-    if ov is None:
-        ov = norm_overrides.get(norm_match(key))
-    if ov is not None:
-        st = ov
+    name = preferred_name(info['names'])
+    st = norm_overrides.get(norm_caseless(name))
+    if st is None:
+        st = norm_overrides.get(norm_caseless(key))
+    if st is None:
+        st = 'normal' if norm_caseless(name) in grouped_names else 'nogroup'
     status_hist[st] = status_hist.get(st, 0) + 1
     props = {
         'id': key,
         'name': name,
-        'status': st or 'unknown',
+        'status': st,
     }
     features.append({
         'type': 'Feature',
@@ -265,7 +243,6 @@ for key, info in geoms.items():
     })
 
 print("status histogram:", status_hist)
-print("unknown status:", [f['properties']['name'] for f in features if f['properties']['status'] == 'unknown'])
 
 out = {'type': 'FeatureCollection', 'crs': {'type': 'name', 'properties': {'name': 'urn:unmap:image-pixels'}}, 'features': features}
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
